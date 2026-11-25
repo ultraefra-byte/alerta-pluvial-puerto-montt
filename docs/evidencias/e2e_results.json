@@ -1,0 +1,25 @@
+{
+  "orig_photo_bytes": 54292,
+  "console_errors": [],
+  "cp19_sync_label_chile": "Actualizado 14:34 (Chile)",
+  "cp17_initial_visible": "3",
+  "cp17_alerce_filtered_visible": "1",
+  "cp18_responsive_viewports": {
+    "375x812": {
+      "sw": 375,
+      "iw": 375
+    },
+    "390x844": {
+      "sw": 390,
+      "iw": 390
+    },
+    "768x1024": {
+      "sw": 753,
+      "iw": 768
+    }
+  },
+  "cp19_canvas_feedback": "Imagen comprimida y lista (18 KB / máx. 2048 KB).",
+  "cp19_new_code": "PM-2026-393A9E5C",
+  "cp19_published_visible_on_map": true,
+  "cp20_audit_events_verified": true
+}
