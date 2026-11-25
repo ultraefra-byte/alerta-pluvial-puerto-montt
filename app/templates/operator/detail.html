@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Gestionar {{ reporte.codigo }} · Operador{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <a href="{{ url_for('operator.dashboard') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+    <i class="bi bi-arrow-left me-1"></i>Volver al Panel
+  </a>
+  <span class="small text-muted">Última actualización: {{ reporte.fecha_actualizacion|fecha_chile }}</span>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card card-pm p-4 mb-3">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 pb-3 border-bottom">
+        <div>
+          <span class="text-muted small text-uppercase fw-semibold">Reporte Ciudadano</span>
+          <h1 class="h4 fw-bold text-primary mb-0">{{ reporte.codigo }}</h1>
+        </div>
+        <div class="d-flex gap-2">
+          <span class="badge badge-pill-soft badge-sev-{{ reporte.severidad }} fs-6">{{ reporte.severidad }}</span>
+          <span
+            class="badge badge-pill-soft badge-estado-{{ reporte.estado|replace(' ', '-')|replace('/', '-') }} fs-6">{{
+            reporte.estado }}</span>
+        </div>
+      </div>
+
+      {% if reporte.estado != 'Rechazado/Duplicado' %}
+      {% set step_order = {'Pendiente': 1, 'En Verificación': 2, 'Publicado/Validado': 3, 'Resuelto/Despejado': 4} %}
+      {% set current_step = step_order.get(reporte.estado, 1) %}
+      <div class="status-stepper mb-3">
+        {% for idx, label, icono in [(1, 'Pendiente', 'bi-inbox'), (2, 'En Verificación', 'bi-search'), (3, 'Publicado',
+        'bi-broadcast'), (4, 'Resuelto', 'bi-check-lg')] %}
+        <div class="status-step {% if current_step > idx %}completed{% elif current_step == idx %}active{% endif %}">
+          <div class="status-step-circle">
+            <i class="bi {% if current_step > idx %}bi-check-lg{% else %}{{ icono }}{% endif %}"></i>
+          </div>
+          <div class="status-step-label">{{ label }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <dl class="row small mb-3">
+        <dt class="col-sm-4 text-muted">Dirección / Referencia</dt>
+        <dd class="col-sm-8 fw-semibold">{{ reporte.direccion_referencia }}</dd>
+
+        <dt class="col-sm-4 text-muted">Sector Geográfico</dt>
+        <dd class="col-sm-8">{{ reporte.sector.nombre if reporte.sector else 'Sin asignar' }}</dd>
+
+        <dt class="col-sm-4 text-muted">Nivel de Agua</dt>
+        <dd class="col-sm-8">{{ reporte.nivel_agua }}</dd>
+
+        <dt class="col-sm-4 text-muted">Reportado por</dt>
+        <dd class="col-sm-8">{{ reporte.reportante_nombre or 'Anónimo' }}</dd>
+
+        <dt class="col-sm-4 text-muted">Fecha de ingreso (Chile)</dt>
+        <dd class="col-sm-8">{{ reporte.fecha_creacion|fecha_chile }}</dd>
+
+        <dt class="col-sm-4 text-muted">Coordenadas GPS</dt>
+        <dd class="col-sm-8"><code>{{ reporte.latitud }}, {{ reporte.longitud }}</code></dd>
+
+        <dt class="col-sm-4 text-muted">Descripción</dt>
+        <dd class="col-sm-8">{{ reporte.descripcion }}</dd>
+      </dl>
+
+      <div id="map-detail" data-lat="{{ reporte.latitud }}" data-lng="{{ reporte.longitud }}"></div>
+
+      {% if reporte.foto_filename %}
+      <div class="mt-3">
+        <h6 class="fw-bold small text-muted mb-2"><i class="bi bi-camera me-1"></i>Respaldo Fotográfico</h6>
+        <img src="{{ url_for('public.serve_evidence', filename=reporte.foto_filename) }}" alt="Foto del reporte"
+          class="img-fluid rounded-3 border w-100" style="max-height: 360px; object-fit: cover;">
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card card-pm p-4 sticky-top" style="top: 84px;">
+      <h2 class="h5 fw-bold mb-2"><i class="bi bi-sliders text-primary me-1"></i>Validación y Cambio de Estado</h2>
+      <p class="small text-muted mb-3">
+        Solo los reportes en estado <strong>Publicado/Validado</strong> aparecen en el mapa público en tiempo real.
+      </p>
+
+      <form method="POST" action="{{ url_for('operator.update_status', reporte_id=reporte.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+          <label for="estado" class="form-label small fw-semibold text-muted">Nuevo Estado *</label>
+          <select name="estado" id="estado" class="form-select" required>
+            {% for est in estados %}
+            <option value="{{ est }}" {% if reporte.estado==est %}selected{% endif %}>{{ est }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="sector_id" class="form-label small fw-semibold text-muted">Sector Geográfico</label>
+          <select name="sector_id" id="sector_id" class="form-select">
+            <option value="">Sin asignar</option>
+            {% for s in sectores %}
+            <option value="{{ s.id }}" {% if reporte.sector_id==s.id %}selected{% endif %}>{{ s.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-4">
+          <label for="nota_operador" class="form-label small fw-semibold text-muted">Observación / Nota
+            Operativa</label>
+          <textarea name="nota_operador" id="nota_operador" rows="4" class="form-control"
+            placeholder="Ej: Confirmado por móvil municipal. Tránsito desviado por calle paralela.">{{ reporte.nota_operador or '' }}</textarea>
+          <div class="form-text text-muted" style="font-size: 0.75rem;">
+            Esta nota será visible públicamente al validar el reporte; evita incluir datos personales (Ley 21.719).
+          </div>
+        </div>
+
+        <div class="d-grid gap-2">
+          <button type="submit" class="btn btn-success btn-lg rounded-pill fw-bold">
+            <i class="bi bi-check-circle-fill me-1"></i>Guardar Cambio de Estado
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const el = document.getElementById("map-detail");
+    if (!el) return;
+    const lat = parseFloat(el.dataset.lat);
+    const lng = parseFloat(el.dataset.lng);
+    const map = L.map("map-detail").setView([lat, lng], 15);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap"
+    }).addTo(map);
+    L.marker([lat, lng]).addTo(map).bindPopup("Ubicación reportada").openPopup();
+  });
+</script>
+{% endblock %}

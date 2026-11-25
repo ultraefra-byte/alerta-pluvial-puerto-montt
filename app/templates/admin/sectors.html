@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Sectores Geográficos · Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+  <div>
+    <h1 class="h4 fw-bold mb-1"><i class="bi bi-geo-alt-fill text-primary me-2"></i>Parametrización de Sectores GIS</h1>
+    <p class="text-muted small mb-0">Edita los polígonos geográficos y niveles de riesgo de Puerto Montt visibles en el mapa público.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="button" id="btn-new-sector" class="btn btn-success btn-sm rounded-pill px-3">
+      <i class="bi bi-plus-circle me-1"></i>Nuevo Sector
+    </button>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">Volver</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card card-pm p-3 p-md-4">
+      <h2 class="h6 fw-bold mb-1" id="sector-form-title">Crear Nuevo Sector Geográfico</h2>
+      <p class="small text-muted mb-2">Haz clic en el mapa para trazar los vértices del polígono (mínimo 3 puntos).</p>
+
+      <div id="map-admin-sectors" class="mb-2"
+           data-lat="{{ default_lat }}"
+           data-lng="{{ default_lng }}"></div>
+      <script id="sectores-data" type="application/json">{{ sectores_data|tojson }}</script>
+
+      <div class="d-flex justify-content-end gap-2 mb-3">
+        <button type="button" id="btn-undo-poly" class="btn btn-outline-secondary btn-sm rounded-pill">
+          <i class="bi bi-arrow-90deg-left me-1"></i>Deshacer vértice
+        </button>
+        <button type="button" id="btn-clear-poly" class="btn btn-outline-danger btn-sm rounded-pill">
+          <i class="bi bi-trash me-1"></i>Limpiar
+        </button>
+      </div>
+
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" id="sector_id" name="sector_id">
+        <div class="row g-2 mb-2">
+          <div class="col-md-7">
+            <label class="form-label small fw-semibold text-muted">Nombre del sector *</label>
+            <input type="text" id="nombre" name="nombre" class="form-control form-control-sm" required>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label small fw-semibold text-muted">Nivel de Riesgo *</label>
+            <select id="nivel_riesgo" name="nivel_riesgo" class="form-select form-select-sm">
+              {% for nr in niveles_riesgo %}
+                <option value="{{ nr }}">{{ nr }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small fw-semibold text-muted">Descripción</label>
+          <input type="text" id="descripcion" name="descripcion" class="form-control form-control-sm">
+        </div>
+
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label small fw-semibold text-muted">Latitud centro *</label>
+            <input type="text" id="lat_centro" name="lat_centro" class="form-control form-control-sm" value="{{ default_lat }}" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-semibold text-muted">Longitud centro *</label>
+            <input type="text" id="lng_centro" name="lng_centro" class="form-control form-control-sm" value="{{ default_lng }}" required>
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label small fw-semibold text-muted">Polígono JSON</label>
+          <textarea id="poligono_json" name="poligono_json" rows="2" class="form-control form-control-sm font-monospace"></textarea>
+        </div>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="activo" name="activo" value="1" checked>
+          <label class="form-check-label small fw-medium" for="activo">Sector activo en el mapa público</label>
+        </div>
+
+        <div class="d-grid">
+          <button type="submit" class="btn btn-primary rounded-pill fw-bold">Guardar Sector</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card card-pm overflow-hidden">
+      <div class="table-responsive">
+        <table class="table table-pm table-hover align-middle mb-0 small">
+          <thead>
+            <tr>
+              <th>Sector</th>
+              <th>Riesgo</th>
+              <th>Estado</th>
+              <th class="text-end">Editar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in sectores %}
+            <tr>
+              <td>
+                <div class="fw-semibold text-dark">{{ s.nombre }}</div>
+                <div class="text-muted" style="font-size: 0.76rem;">{{ s.descripcion or '-' }}</div>
+              </td>
+              <td>
+                <span class="badge rounded-pill {% if s.nivel_riesgo == 'Alto' %}bg-danger{% elif s.nivel_riesgo == 'Medio' %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                  {{ s.nivel_riesgo }}
+                </span>
+              </td>
+              <td>
+                {% if s.activo %}
+                  <span class="badge badge-pill-soft badge-estado-Publicado-Validado">Activo</span>
+                {% else %}
+                  <span class="badge badge-pill-soft badge-estado-Pendiente">Inactivo</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill btn-edit-sector" data-id="{{ s.id }}" title="Editar sector">
+                  <i class="bi bi-pencil"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/admin_sectors.js') }}"></script>
+{% endblock %}

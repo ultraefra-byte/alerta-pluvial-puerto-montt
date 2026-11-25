@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Gestión de Usuarios RBAC · Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h4 fw-bold mb-1"><i class="bi bi-people-fill text-primary me-2"></i>Gestión de Usuarios y Roles (RBAC)</h1>
+    <p class="text-muted small mb-0">Administra cuentas de Ciudadanos, Operadores de Emergencia y Administradores.</p>
+  </div>
+  <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3">Volver</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card card-pm p-4">
+      <h2 class="h6 fw-bold mb-3"><i class="bi bi-person-plus text-primary me-1"></i>Crear Nuevo Usuario</h2>
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-2">
+          <label class="form-label small fw-semibold text-muted">Nombre completo</label>
+          <input type="text" name="nombre" class="form-control form-control-sm" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold text-muted">Correo electrónico</label>
+          <input type="email" name="email" class="form-control form-control-sm" required>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold text-muted">Contraseña temporal</label>
+          <input type="password" name="password" class="form-control form-control-sm" minlength="6" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-muted">Rol RBAC</label>
+          <select name="rol" class="form-select form-select-sm">
+            {% for r in roles %}
+              <option value="{{ r }}">{{ r|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="d-grid">
+          <button type="submit" class="btn btn-primary rounded-pill fw-semibold">Crear Usuario</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card card-pm overflow-hidden">
+      <div class="table-responsive">
+        <table class="table table-pm table-hover align-middle mb-0 small">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Rol</th>
+              <th>Estado</th>
+              <th class="text-end">Guardar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in usuarios %}
+            <tr>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="avatar-circle">{{ u.nombre[:1]|upper }}</span>
+                  <div>
+                    <div class="fw-semibold text-dark">{{ u.nombre }}</div>
+                    <div class="text-muted" style="font-size: 0.76rem;">{{ u.email }}</div>
+                  </div>
+                </div>
+              </td>
+              <td colspan="3">
+                <form method="POST" action="{{ url_for('admin.update_user', user_id=u.id) }}" class="row g-2 align-items-center">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div class="col-5">
+                    <select name="rol" class="form-select form-select-sm">
+                      {% for r in roles %}
+                        <option value="{{ r }}" {% if u.rol == r %}selected{% endif %}>{{ r|capitalize }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-4">
+                    <select name="activo" class="form-select form-select-sm">
+                      <option value="1" {% if u.activo %}selected{% endif %}>Activo</option>
+                      <option value="0" {% if not u.activo %}selected{% endif %}>Inactivo</option>
+                    </select>
+                  </div>
+                  <div class="col-3 text-end">
+                    <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill px-3">Guardar</button>
+                  </div>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

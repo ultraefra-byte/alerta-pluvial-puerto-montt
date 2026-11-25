@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Panel de Operador · Moderación de Reportes{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+  <div>
+    <h1 class="h4 fw-bold mb-1"><i class="bi bi-shield-check text-primary me-2"></i>Panel de Validación de Operadores</h1>
+    <p class="text-muted small mb-0">Modera reportes ciudadanos entrantes y actualiza el mapa público en tiempo real.</p>
+  </div>
+  <a href="{{ url_for('public.index') }}" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+    <i class="bi bi-map me-1"></i>Ver Mapa Público
+  </a>
+</div>
+
+<!-- Contadores interactivos por estado -->
+{% set estado_accent = {
+  'Pendiente': '#64748b',
+  'En Verificación': '#0284c7',
+  'Publicado/Validado': '#16a34a',
+  'Rechazado/Duplicado': '#dc2626',
+  'Resuelto/Despejado': '#0f766e'
+} %}
+<div class="row g-2 mb-4">
+  {% for est in estados %}
+  <div class="col-6 col-md">
+    <a href="{{ url_for('operator.dashboard', estado=est) }}" class="text-decoration-none">
+      <div class="kpi-card text-center py-2 px-2 {% if filtros.estado == est %}border-primary border-2{% endif %}"
+           style="border-top: 3px solid {{ estado_accent[est] }};">
+        <div class="kpi-value" style="color: {{ estado_accent[est] }}; font-size: 1.4rem;">{{ contadores[est] }}</div>
+        <div class="small text-muted fw-medium text-truncate" style="font-size:0.74rem;">{{ est }}</div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Filtros -->
+<form method="GET" class="card card-pm p-3 mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small fw-semibold text-muted mb-1">Buscar</label>
+      <input type="text" name="q" class="form-control form-control-sm" placeholder="Código, calle o descripción..." value="{{ filtros.q }}">
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label small fw-semibold text-muted mb-1">Estado</label>
+      <select name="estado" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        {% for est in estados %}
+          <option value="{{ est }}" {% if filtros.estado == est %}selected{% endif %}>{{ est }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small fw-semibold text-muted mb-1">Sector</label>
+      <select name="sector_id" class="form-select form-select-sm">
+        <option value="">Todos los sectores</option>
+        {% for s in sectores %}
+          <option value="{{ s.id }}" {% if filtros.sector_id == s.id %}selected{% endif %}>{{ s.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label small fw-semibold text-muted mb-1">Severidad</label>
+      <select name="severidad" class="form-select form-select-sm">
+        <option value="">Todas</option>
+        {% for sev in ['Critica', 'Alta', 'Media', 'Baja'] %}
+          <option value="{{ sev }}" {% if filtros.severidad == sev %}selected{% endif %}>{{ sev }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-2 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Filtrar</button>
+      <a href="{{ url_for('operator.dashboard') }}" class="btn btn-outline-secondary btn-sm" title="Limpiar">
+        <i class="bi bi-x-lg"></i>
+      </a>
+    </div>
+  </div>
+</form>
+
+<!-- Tabla de reportes con acciones rápidas -->
+<div class="card card-pm overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-pm table-hover align-middle mb-0 small">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Fecha (Chile)</th>
+          <th>Dirección / Sector</th>
+          <th>Nivel / Sev.</th>
+          <th>Estado</th>
+          <th class="text-center">Foto</th>
+          <th class="text-end">Acciones Rápidas / Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rep in reportes %}
+        <tr>
+          <td class="fw-bold text-primary">{{ rep.codigo }}</td>
+          <td class="text-nowrap">{{ rep.fecha_creacion|fecha_chile }}</td>
+          <td>
+            <div class="fw-semibold text-dark">{{ rep.direccion_referencia }}</div>
+            <div class="text-muted" style="font-size:0.76rem;">
+              <i class="bi bi-geo-alt me-1"></i>{{ rep.sector.nombre if rep.sector else 'Sin sector' }} · {{ rep.reportante_nombre or 'Anónimo' }}
+            </div>
+          </td>
+          <td>
+            <span class="badge badge-pill-soft badge-sev-{{ rep.severidad }}">{{ rep.severidad }}</span>
+            <div class="text-muted mt-1" style="font-size:0.74rem;">{{ rep.nivel_agua }}</div>
+          </td>
+          <td>
+            <span class="badge badge-pill-soft badge-estado-{{ rep.estado|replace(' ', '-')|replace('/', '-') }}">{{ rep.estado }}</span>
+          </td>
+          <td class="text-center">
+            {% if rep.foto_filename %}
+              <span class="badge bg-success bg-opacity-10 text-success rounded-pill"><i class="bi bi-camera-fill"></i></span>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td class="text-end text-nowrap">
+            <div class="d-inline-flex align-items-center gap-1">
+              {% if rep.estado in ('Pendiente', 'En Verificación') %}
+              <form method="POST" action="{{ url_for('operator.update_status', reporte_id=rep.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="estado" value="Publicado/Validado">
+                <input type="hidden" name="next" value="dashboard">
+                <button type="submit" class="btn btn-outline-success btn-sm" title="Validar y publicar en el mapa">
+                  <i class="bi bi-check-lg"></i>
+                </button>
+              </form>
+              {% endif %}
+              {% if rep.estado == 'Publicado/Validado' %}
+              <form method="POST" action="{{ url_for('operator.update_status', reporte_id=rep.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="estado" value="Resuelto/Despejado">
+                <input type="hidden" name="next" value="dashboard">
+                <button type="submit" class="btn btn-outline-info btn-sm" title="Marcar vía como despejada">
+                  <i class="bi bi-check2-all"></i>
+                </button>
+              </form>
+              {% endif %}
+              {% if rep.estado in ('Pendiente', 'En Verificación') %}
+              <form method="POST" action="{{ url_for('operator.update_status', reporte_id=rep.id) }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="estado" value="Rechazado/Duplicado">
+                <input type="hidden" name="next" value="dashboard">
+                <button type="submit" class="btn btn-outline-danger btn-sm" title="Rechazar o marcar duplicado">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </form>
+              {% endif %}
+              <a href="{{ url_for('operator.detail', reporte_id=rep.id) }}" class="btn btn-primary btn-sm rounded-pill px-3">
+                <i class="bi bi-sliders me-1"></i>Gestionar
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-5">No se encontraron reportes con los filtros aplicados.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Historial de Incidentes · Alerta Pluvial{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+  <div>
+    <h1 class="h4 fw-bold mb-1"><i class="bi bi-clock-history text-primary me-2"></i>Historial y Recurrencia por Sector</h1>
+    <p class="text-muted small mb-0">
+      Registro histórico de anegamientos validados y resueltos para identificar sectores recurrentes en Puerto Montt.
+    </p>
+  </div>
+  <a href="{{ url_for('public.index') }}" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+    <i class="bi bi-map me-1"></i>Volver al Mapa en Vivo
+  </a>
+</div>
+
+<!-- Tarjetas de recurrencia por sector -->
+<div class="row g-3 mb-4">
+  {% for r in recurrencia %}
+  {% set pct = ((r.total_incidentes / max_incidentes) * 100)|round|int %}
+  <div class="col-6 col-md-4 col-lg-3">
+    <a href="{{ url_for('public.history', sector_id=r.id) }}" class="text-decoration-none text-body">
+      <div class="card card-pm card-pm-hover p-3 h-100 {% if filtros.sector_id == r.id %}border-primary border-2{% endif %}">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+          <span class="fw-bold small">{{ r.nombre }}</span>
+          <span class="badge rounded-pill {% if r.nivel_riesgo == 'Alto' %}bg-danger{% elif r.nivel_riesgo == 'Medio' %}bg-warning text-dark{% else %}bg-success{% endif %}" style="font-size:0.68rem;">
+            Riesgo {{ r.nivel_riesgo }}
+          </span>
+        </div>
+        <div class="d-flex align-items-baseline gap-1 mb-2">
+          <span class="h4 fw-bold text-primary mb-0">{{ r.total_incidentes }}</span>
+          <span class="small text-muted">incidente{{ 's' if r.total_incidentes != 1 else '' }}</span>
+        </div>
+        <div class="progress" style="height: 5px;">
+          <div class="progress-bar {% if r.nivel_riesgo == 'Alto' %}bg-danger{% elif r.nivel_riesgo == 'Medio' %}bg-warning{% else %}bg-success{% endif %}"
+               style="width: {{ pct if r.total_incidentes > 0 else 4 }}%;"></div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Filtros -->
+<form method="GET" class="card card-pm p-3 mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label small fw-semibold text-muted mb-1">Sector Geográfico</label>
+      <select name="sector_id" class="form-select form-select-sm">
+        <option value="">Todos los sectores</option>
+        {% for s in sectores %}
+          <option value="{{ s.id }}" {% if filtros.sector_id == s.id %}selected{% endif %}>{{ s.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small fw-semibold text-muted mb-1">Severidad</label>
+      <select name="severidad" class="form-select form-select-sm">
+        <option value="">Todas</option>
+        {% for sev in ['Critica', 'Alta', 'Media', 'Baja'] %}
+          <option value="{{ sev }}" {% if filtros.severidad == sev %}selected{% endif %}>{{ sev }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small fw-semibold text-muted mb-1">Estado</label>
+      <select name="estado" class="form-select form-select-sm">
+        <option value="">Activos y Resueltos</option>
+        <option value="Publicado/Validado" {% if filtros.estado == 'Publicado/Validado' %}selected{% endif %}>Publicado/Validado</option>
+        <option value="Resuelto/Despejado" {% if filtros.estado == 'Resuelto/Despejado' %}selected{% endif %}>Resuelto/Despejado</option>
+      </select>
+    </div>
+    <div class="col-md-2 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Filtrar</button>
+      <a href="{{ url_for('public.history') }}" class="btn btn-outline-secondary btn-sm" title="Limpiar">
+        <i class="bi bi-x-lg"></i>
+      </a>
+    </div>
+  </div>
+</form>
+
+<!-- Tabla de historial -->
+<div class="card card-pm overflow-hidden">
+  <div class="table-responsive">
+    <table class="table table-pm table-hover align-middle mb-0 small">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Fecha (Chile)</th>
+          <th>Sector</th>
+          <th>Dirección / Referencia</th>
+          <th>Severidad</th>
+          <th>Estado</th>
+          <th class="text-end">Mapa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rep in reportes %}
+        <tr>
+          <td class="fw-bold">
+            <a href="{{ url_for('public.track_report', codigo=rep.codigo) }}" class="text-decoration-none">{{ rep.codigo }}</a>
+          </td>
+          <td class="text-nowrap">{{ rep.fecha_creacion|fecha_chile }}</td>
+          <td><span class="fw-medium">{{ rep.sector.nombre if rep.sector else 'Sin sector' }}</span></td>
+          <td>
+            <div class="fw-semibold text-dark">{{ rep.direccion_referencia }}</div>
+            {% if rep.nota_operador %}
+              <div class="text-muted" style="font-size: 0.76rem;"><i class="bi bi-shield-check me-1"></i>{{ rep.nota_operador }}</div>
+            {% endif %}
+          </td>
+          <td><span class="badge badge-pill-soft badge-sev-{{ rep.severidad }}">{{ rep.severidad }}</span></td>
+          <td>
+            <span class="badge badge-pill-soft badge-estado-{{ rep.estado|replace(' ', '-')|replace('/', '-') }}">{{ rep.estado }}</span>
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('public.index', focus=rep.codigo, resueltos='1' if rep.estado == 'Resuelto/Despejado' else None) }}"
+               class="btn btn-outline-primary btn-sm rounded-pill" title="Ubicar en el mapa">
+              <i class="bi bi-geo-alt"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-5">No existen incidentes históricos para los filtros seleccionados.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

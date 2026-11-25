@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Administración · Alerta Pluvial{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+  <div>
+    <h1 class="h4 fw-bold mb-1"><i class="bi bi-sliders2 text-primary me-2"></i>Panel de Administración del Sistema</h1>
+    <p class="text-muted small mb-0">Control de usuarios RBAC, parametrización GIS de sectores y auditoría completa.</p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{{ url_for('admin.users') }}" class="btn btn-primary btn-sm rounded-pill px-3"><i class="bi bi-people me-1"></i>Usuarios</a>
+    <a href="{{ url_for('admin.sectors') }}" class="btn btn-outline-primary btn-sm rounded-pill px-3"><i class="bi bi-geo-alt me-1"></i>Sectores GIS</a>
+    <a href="{{ url_for('admin.audit') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3"><i class="bi bi-journal-text me-1"></i>Auditoría</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card text-center">
+      <div class="kpi-value text-primary">{{ stats.total_usuarios }}</div>
+      <div class="small text-muted fw-medium">Usuarios</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card text-center">
+      <div class="kpi-value text-info">{{ stats.operadores }}</div>
+      <div class="small text-muted fw-medium">Operadores</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card text-center">
+      <div class="kpi-value text-success">{{ stats.sectores_activos }}</div>
+      <div class="small text-muted fw-medium">Sectores Activos</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card text-center">
+      <div class="kpi-value text-dark">{{ stats.reportes_totales }}</div>
+      <div class="small text-muted fw-medium">Reportes Totales</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card text-center">
+      <div class="kpi-value text-warning">{{ stats.reportes_pendientes }}</div>
+      <div class="small text-muted fw-medium">Pendientes</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-lg-2">
+    <div class="kpi-card text-center">
+      <div class="kpi-value text-danger">{{ stats.reportes_publicados }}</div>
+      <div class="small text-muted fw-medium">Publicados</div>
+    </div>
+  </div>
+</div>
+
+<div class="card card-pm overflow-hidden">
+  <div class="p-3 bg-white border-bottom d-flex justify-content-between align-items-center">
+    <span class="fw-bold small"><i class="bi bi-activity text-primary me-1"></i>Actividad Reciente (Auditoría)</span>
+    <a href="{{ url_for('admin.audit') }}" class="small fw-semibold text-decoration-none">Ver bitácora completa &rarr;</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-pm table-hover align-middle mb-0 small">
+      <thead>
+        <tr>
+          <th>Fecha (Chile)</th>
+          <th>Usuario</th>
+          <th>Acción</th>
+          <th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in auditorias %}
+        <tr>
+          <td class="text-nowrap">{{ a.fecha|fecha_chile }}</td>
+          <td class="fw-medium">{{ a.usuario.nombre if a.usuario else 'Anónimo / Sistema' }}</td>
+          <td><span class="badge badge-pill-soft badge-estado-Pendiente">{{ a.accion }}</span></td>
+          <td class="text-muted">{{ a.detalle }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-center text-muted py-4">Sin registros de auditoría.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

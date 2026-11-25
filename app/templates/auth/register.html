@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Registro Ciudadano · Alerta Pluvial{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-2">
+  <div class="col-md-7 col-lg-5">
+    <div class="card card-pm p-4 p-md-5">
+      <div class="text-center mb-4">
+        <div class="brand-icon-box mx-auto mb-3"
+          style="width: 54px; height: 54px; font-size: 1.6rem; background: linear-gradient(135deg, #0b2540, #0e5277);">
+          <i class="bi bi-person-plus-fill text-info"></i>
+        </div>
+        <h1 class="h4 fw-bold mb-1">Registro de Ciudadano</h1>
+        <p class="text-muted small mb-0">Crea tu cuenta para llevar el historial y estado en tiempo real de tus
+          reportes.</p>
+      </div>
+
+      <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+          <label for="nombre" class="form-label small fw-semibold text-muted">Nombre completo</label>
+          <input type="text" class="form-control" id="nombre" name="nombre" placeholder="Ej: Camila Soto"
+            value="{{ form_data.get('nombre', '') }}" required>
+        </div>
+        <div class="mb-3">
+          <label for="email" class="form-label small fw-semibold text-muted">Correo electrónico</label>
+          <input type="email" class="form-control" id="email" name="email" placeholder="nombre@ejemplo.cl"
+            value="{{ form_data.get('email', '') }}" required>
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label small fw-semibold text-muted">Contraseña (mín. 8 caracteres,
+            mayúscula, minúscula y dígito)</label>
+          <input type="password" class="form-control" id="password" name="password" required>
+        </div>
+        <div class="mb-3">
+          <label for="confirm_password" class="form-label small fw-semibold text-muted">Confirmar contraseña</label>
+          <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+        </div>
+        <div class="p-3 rounded-3 bg-light border mb-3 small text-muted">
+          <div class="fw-semibold text-dark mb-1"><i class="bi bi-shield-lock text-primary me-1"></i>Aviso de Privacidad
+            (Leyes N° 19.628 y N° 21.719)</div>
+          <p class="mb-2" style="font-size: 0.78rem;">
+            Tu nombre y correo serán tratados exclusivamente en el marco del prototipo académico <em>Alerta Pluvial
+              Puerto Montt</em> (TI3043 · INACAP) para asociar y consultar el estado de tus reportes, conservándose solo
+            durante el semestre en curso. Puedes ejercer derechos de acceso, rectificación, supresión y oposición.
+          </p>
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" id="acepta_privacidad" name="acepta_privacidad" value="1" {%
+              if form_data.get('acepta_privacidad')=='1' %}checked{% endif %} required>
+            <label class="form-check-label text-dark fw-semibold" for="acepta_privacidad" style="font-size: 0.8rem;">
+              He leído y acepto el aviso de privacidad y el tratamiento de mis datos. *
+            </label>
+          </div>
+        </div>
+        <div class="d-grid mb-3">
+          <button type="submit" class="btn btn-primary btn-lg rounded-pill fw-bold">Crear Cuenta</button>
+        </div>
+      </form>
+
+      <div class="text-center small">
+        ¿Ya tienes cuenta? <a href="{{ url_for('auth.login') }}" class="fw-semibold text-decoration-none">Inicia
+          sesión</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

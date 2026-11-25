@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Mapa de Emergencias en Vivo · Alerta Pluvial Puerto Montt{% endblock %}
+
+{% block content %}
+<!-- Hero compacto -->
+<section class="hero-pm mb-4">
+  <div class="row align-items-center g-3 position-relative" style="z-index: 1;">
+    <div class="col-lg-8">
+      <div class="d-inline-flex align-items-center gap-2 mb-2 px-2 py-1 rounded-pill" style="background: rgba(255,255,255,0.12); font-size: 0.76rem;">
+        <i class="bi bi-geo-alt-fill text-info"></i>
+        <span>Comuna de Puerto Montt · Región de Los Lagos</span>
+      </div>
+      <h1 class="h3 fw-bold mb-2 text-white">Monitoreo Ciudadano de Inundaciones Urbanas</h1>
+      <p class="mb-0 text-white-50 small" style="max-width: 640px;">
+        Consulta en tiempo real el estado de las calles y sectores con anegamiento <strong class="text-white">validados por operadores de emergencia</strong>, o reporta un nuevo punto crítico desde tu teléfono.
+      </p>
+    </div>
+    <div class="col-lg-4 text-lg-end">
+      <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+        <a href="{{ url_for('public.report_form') }}" class="btn btn-danger fw-bold px-4 py-2 rounded-pill shadow">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i> Reportar Inundación
+        </a>
+        <a href="{{ url_for('public.track_report') }}" class="btn btn-outline-light fw-semibold px-3 py-2 rounded-pill">
+          <i class="bi bi-search me-1"></i> Seguimiento
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- KPIs en tiempo real -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card d-flex align-items-center gap-3">
+      <div class="kpi-icon bg-primary bg-opacity-10 text-primary">
+        <i class="bi bi-broadcast"></i>
+      </div>
+      <div>
+        <div class="kpi-value text-primary" id="kpi-activos">{{ activos_count }}</div>
+        <div class="small text-muted fw-medium">Incidentes activos</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card d-flex align-items-center gap-3">
+      <div class="kpi-icon bg-danger bg-opacity-10 text-danger">
+        <i class="bi bi-exclamation-octagon-fill"></i>
+      </div>
+      <div>
+        <div class="kpi-value text-danger" id="kpi-criticos">{{ criticos_count }}</div>
+        <div class="small text-muted fw-medium">Puntos críticos</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card d-flex align-items-center gap-3">
+      <div class="kpi-icon bg-warning bg-opacity-10 text-warning">
+        <i class="bi bi-layers-fill"></i>
+      </div>
+      <div>
+        <div class="kpi-value text-dark" id="kpi-sectores">{{ sectores_alerta_count }}</div>
+        <div class="small text-muted fw-medium">Sectores con alerta</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card d-flex align-items-center gap-3">
+      <div class="kpi-icon bg-success bg-opacity-10 text-success">
+        <i class="bi bi-check-circle-fill"></i>
+      </div>
+      <div>
+        <div class="kpi-value text-success" id="kpi-resueltos">{{ resueltos_count }}</div>
+        <div class="small text-muted fw-medium">Vías despejadas</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Barra de filtros GIS (RF04) -->
+<div class="card card-pm p-3 mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-12 col-sm-6 col-lg-3">
+      <label for="filter-sector" class="form-label small fw-semibold text-muted mb-1">
+        <i class="bi bi-geo-alt me-1"></i>Sector Geográfico
+      </label>
+      <select id="filter-sector" class="form-select form-select-sm">
+        <option value="">Todos los sectores de Puerto Montt</option>
+        {% for s in sectores %}
+          <option value="{{ s.id }}">{{ s.nombre }} · Riesgo {{ s.nivel_riesgo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-sm-6 col-lg-2">
+      <label for="filter-severidad" class="form-label small fw-semibold text-muted mb-1">
+        <i class="bi bi-funnel me-1"></i>Severidad
+      </label>
+      <select id="filter-severidad" class="form-select form-select-sm">
+        <option value="">Todas</option>
+        <option value="Critica">Crítica (&gt;80 cm)</option>
+        <option value="Alta">Alta (40-80 cm)</option>
+        <option value="Media">Media (15-40 cm)</option>
+        <option value="Baja">Baja (&lt;15 cm)</option>
+      </select>
+    </div>
+    <div class="col-6 col-sm-6 col-lg-2">
+      <label for="filter-desde" class="form-label small fw-semibold text-muted mb-1">Desde</label>
+      <input type="date" id="filter-desde" class="form-control form-control-sm">
+    </div>
+    <div class="col-6 col-sm-6 col-lg-2">
+      <label for="filter-hasta" class="form-label small fw-semibold text-muted mb-1">Hasta</label>
+      <input type="date" id="filter-hasta" class="form-control form-control-sm">
+    </div>
+    <div class="col-6 col-sm-6 col-lg-3 d-flex flex-wrap gap-2 justify-content-lg-end align-items-center">
+      <div class="form-check form-switch mb-0 small">
+        <input class="form-check-input" type="checkbox" id="toggle-zonas" checked>
+        <label class="form-check-label fw-medium" for="toggle-zonas">Zonas riesgo</label>
+      </div>
+      <div class="form-check form-switch mb-0 small">
+        <input class="form-check-input" type="checkbox" id="toggle-resueltos">
+        <label class="form-check-label fw-medium" for="toggle-resueltos">Resueltos</label>
+      </div>
+      <button id="btn-reset-filters" type="button" class="btn btn-outline-secondary btn-sm" title="Restablecer filtros">
+        <i class="bi bi-arrow-counterclockwise"></i>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Mapa GIS + Panel Lateral de Incidentes -->
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card card-pm p-2 p-md-3">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-1 pb-2">
+        <div class="d-flex align-items-center gap-2 small">
+          <span class="fw-bold text-dark"><i class="bi bi-map-fill text-primary me-1"></i>Mapa GIS Interactivo</span>
+          <span class="text-muted" id="last-sync-label" style="font-size: 0.76rem;">Cargando...</span>
+        </div>
+        <div class="d-flex gap-1">
+          <button type="button" id="btn-my-location" class="btn btn-light border btn-sm" title="Centrar en mi ubicación">
+            <i class="bi bi-crosshair"></i> <span class="d-none d-sm-inline">Mi ubicación</span>
+          </button>
+          <button type="button" id="btn-refresh-map" class="btn btn-light border btn-sm" title="Actualizar datos del mapa">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="map-public"
+           data-lat="{{ default_lat }}"
+           data-lng="{{ default_lng }}"
+           data-zoom="{{ default_zoom }}"></div>
+
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-1 pt-3 pb-1 small text-muted">
+        <div class="d-flex flex-wrap gap-3">
+          <span><span class="legend-dot" style="background:#dc2626;"></span>Crítica</span>
+          <span><span class="legend-dot" style="background:#f97316;"></span>Alta</span>
+          <span><span class="legend-dot" style="background:#f59e0b;"></span>Media</span>
+          <span><span class="legend-dot" style="background:#0ea5e9;"></span>Baja</span>
+          <span><span class="legend-dot" style="background:#0f766e;"></span>Resuelto</span>
+        </div>
+        <span style="font-size: 0.74rem;"><i class="bi bi-shield-lock me-1"></i>Solo reportes validados</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card card-pm h-100 d-flex flex-column overflow-hidden">
+      <div class="p-3 border-bottom bg-white">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="fw-bold small"><i class="bi bi-broadcast text-danger me-1"></i>Incidentes Visibles</span>
+          <span class="badge bg-primary rounded-pill" id="visible-count">0</span>
+        </div>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+          <input type="text" id="quick-search" class="form-control bg-light border-start-0" placeholder="Buscar calle, sector o código...">
+        </div>
+      </div>
+
+      <div class="list-group list-group-flush overflow-auto flex-grow-1" id="incident-list" style="max-height: 56vh;">
+        <div class="text-center text-muted py-5 small">
+          <div class="spinner-border spinner-border-sm text-primary mb-2"></div>
+          <div>Cargando alertas validadas...</div>
+        </div>
+      </div>
+
+      <div class="p-3 bg-light border-top">
+        <a href="{{ url_for('public.report_form') }}" class="btn btn-danger w-100 fw-bold rounded-pill">
+          <i class="bi bi-plus-circle-fill me-1"></i> Reportar Nueva Inundación
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<a href="{{ url_for('public.report_form') }}" class="btn btn-danger fab-report d-lg-none">
+  <i class="bi bi-exclamation-triangle-fill me-1"></i> Reportar
+</a>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/map_public.js') }}"></script>
+{% endblock %}

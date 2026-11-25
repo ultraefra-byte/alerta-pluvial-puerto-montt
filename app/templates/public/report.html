@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}Reportar Inundación · Alerta Pluvial{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-9 col-xl-8">
+    <div class="hero-pm mb-4 py-3 px-4">
+      <div class="d-flex align-items-center gap-3 position-relative" style="z-index: 1;">
+        <div class="brand-icon-box" style="width: 46px; height: 46px; font-size: 1.4rem;">
+          <i class="bi bi-megaphone-fill text-warning"></i>
+        </div>
+        <div>
+          <h1 class="h4 fw-bold text-white mb-1">Reporte Ciudadano en Terreno</h1>
+          <p class="small text-white-50 mb-0">
+            Tu aviso ingresa en estado <strong class="text-white">Pendiente</strong> y un Operador de Emergencias lo
+            validará antes de publicarlo en el mapa.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-pm p-3 p-md-4">
+      <form method="POST" enctype="multipart/form-data" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <!-- Bloque 1: Ubicación -->
+        <div class="mb-4 pb-3 border-bottom">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+            <div>
+              <span class="badge bg-primary rounded-pill me-1">1</span>
+              <label class="form-label fw-bold mb-0">Ubicación exacta del incidente *</label>
+            </div>
+            <button type="button" id="btn-gps" class="btn btn-primary btn-sm rounded-pill px-3">
+              <i class="bi bi-crosshair me-1"></i> Detectar con mi GPS
+            </button>
+          </div>
+
+          <div id="map-report" data-lat="{{ default_lat }}" data-lng="{{ default_lng }}"></div>
+          <div id="gps-status" class="form-text mt-2">
+            <i class="bi bi-hand-index-thumb text-primary me-1"></i>Toca cualquier punto del mapa de Puerto Montt o usa
+            el botón de GPS.
+          </div>
+
+          <div class="row g-2 mt-2">
+            <div class="col-6">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light text-muted">Lat</span>
+                <input type="text" class="form-control bg-light" id="latitud" name="latitud" placeholder="Sin marcar"
+                  value="{{ form_data.get('latitud', '') }}" required readonly>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light text-muted">Lng</span>
+                <input type="text" class="form-control bg-light" id="longitud" name="longitud" placeholder="Sin marcar"
+                  value="{{ form_data.get('longitud', '') }}" required readonly>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloque 2: Dirección y Sector -->
+        <div class="mb-4 pb-3 border-bottom">
+          <div class="mb-2">
+            <span class="badge bg-primary rounded-pill me-1">2</span>
+            <span class="fw-bold">Referencia de calle y sector</span>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-7">
+              <label for="direccion_referencia" class="form-label small fw-semibold text-muted">Dirección o punto de
+                referencia *</label>
+              <input type="text" class="form-control" id="direccion_referencia" name="direccion_referencia"
+                placeholder="Ej: Av. Diego Portales frente al Terminal de Buses"
+                value="{{ form_data.get('direccion_referencia', '') }}" required>
+            </div>
+            <div class="col-md-5">
+              <label for="sector_id" class="form-label small fw-semibold text-muted">Sector geográfico
+                (opcional)</label>
+              <select class="form-select" id="sector_id" name="sector_id">
+                <option value="">Detectar automáticamente por GPS</option>
+                {% for s in sectores %}
+                <option value="{{ s.id }}" data-lat="{{ s.lat_centro }}" data-lng="{{ s.lng_centro }}" {% if
+                  form_data.get('sector_id')==s.id|string %}selected{% endif %}>
+                  {{ s.nombre }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloque 3: Nivel de agua (Tarjetas táctiles Mobile-First) -->
+        <div class="mb-4 pb-3 border-bottom">
+          <div class="mb-2">
+            <span class="badge bg-primary rounded-pill me-1">3</span>
+            <span class="fw-bold">Nivel aproximado de agua *</span>
+          </div>
+          {% set nivel_actual = form_data.get('nivel_agua', '') %}
+          <div class="row g-2">
+            {% set nivel_meta = {
+            'Bajo': ('#0ea5e9', 'bi-droplet', '< 15 cm', 'Poza superficial' ), 'Moderado' :
+              ('#f59e0b', 'bi-droplet-half' , '15 - 40 cm' , 'Dificulta tránsito' ), 'Alto' : ('#f97316', 'bi-water'
+              , '40 - 80 cm' , 'Riesgo vehículos' ), 'Critico' : ('#dc2626', 'bi-exclamation-octagon-fill' , '> 80 cm'
+              , 'Calle cortada / severo' ) } %} {% for codigo, etiqueta, sev in niveles_agua %} {% set color, icono,
+              altura, sub=nivel_meta[codigo] %} <div class="col-6 col-md-3">
+              <label class="water-level-option d-block h-100">
+                <input type="radio" name="nivel_agua" value="{{ codigo }}" {% if nivel_actual==codigo %}checked{% endif
+                  %} required>
+                <div class="water-level-card d-flex flex-column justify-content-between">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <i class="bi {{ icono }} fs-5" style="color: {{ color }};"></i>
+                    <span class="badge badge-pill-soft badge-sev-{{ sev }}">{{ sev }}</span>
+                  </div>
+                  <div>
+                    <div class="fw-bold small">{{ codigo }}</div>
+                    <div class="fw-semibold" style="font-size: 0.78rem; color: {{ color }};">{{ altura }}</div>
+                    <div class="text-muted" style="font-size: 0.72rem;">{{ sub }}</div>
+                  </div>
+                </div>
+              </label>
+          </div>
+          {% endfor %}
+        </div>
+    </div>
+
+    <!-- Bloque 4: Descripción y Fotografía -->
+    <div class="mb-4">
+      <div class="mb-2">
+        <span class="badge bg-primary rounded-pill me-1">4</span>
+        <span class="fw-bold">Detalle y respaldo fotográfico</span>
+      </div>
+
+      <div class="mb-3">
+        <label for="descripcion" class="form-label small fw-semibold text-muted">Descripción de la emergencia *</label>
+        <textarea class="form-control" id="descripcion" name="descripcion" rows="3"
+          placeholder="Ej: Sumideros obstruidos, agua cubre ambas pistas, vehículos desviando por pasaje cercano..."
+          required>{{ form_data.get('descripcion', '') }}</textarea>
+        <div class="form-text text-muted" style="font-size: 0.76rem;">
+          <i class="bi bi-shield-check me-1"></i>Privacidad: No incluyas nombres de terceros, RUT, patentes ni teléfonos en la descripción pública.
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label small fw-semibold text-muted">Fotografía de respaldo (opcional · compresión automática
+          máx. 2 MB)</label>
+        <input type="file" class="d-none" id="foto" name="foto" accept="image/*" capture="environment">
+        <div id="photo-dropzone" class="photo-dropzone">
+          <i class="bi bi-camera-fill fs-2 text-primary opacity-75"></i>
+          <div class="fw-semibold small mt-1">Toca para tomar o seleccionar una fotografía</div>
+          <div class="text-muted" style="font-size: 0.75rem;">JPG, PNG o WEBP · Optimizada para redes móviles lentas
+          </div>
+        </div>
+        <div id="foto-feedback" class="form-text mt-2"></div>
+        <div id="foto-preview-wrap" class="mt-2 d-none position-relative d-inline-block">
+          <img id="foto-preview" class="img-thumbnail rounded-3" style="max-height: 210px;" alt="Vista previa">
+          <button type="button" id="btn-remove-foto"
+            class="btn btn-dark btn-sm rounded-circle position-absolute top-0 end-0 m-1" title="Quitar foto">
+            <i class="bi bi-x"></i>
+          </button>
+        </div>
+      </div>
+
+      {% if not current_user.is_authenticated %}
+      <div class="p-3 bg-light rounded-3 border">
+        <label for="reportante_nombre" class="form-label small fw-semibold mb-1">Tu nombre o alias (opcional)</label>
+        <input type="text" class="form-control form-control-sm" id="reportante_nombre" name="reportante_nombre"
+          placeholder="Déjalo vacío para reportar de forma 100% anónima"
+          value="{{ form_data.get('reportante_nombre', '') }}">
+        <div class="form-text mt-1">
+          ¿Deseas guardar tu historial personal de reportes? <a href="{{ url_for('auth.login') }}">Inicia sesión</a> o
+          <a href="{{ url_for('auth.register') }}">regístrate</a>.
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="d-grid gap-2 d-md-flex justify-content-md-end pt-2">
+      <a href="{{ url_for('public.index') }}" class="btn btn-outline-secondary rounded-pill px-4">Cancelar</a>
+      <button type="submit" class="btn btn-danger btn-lg rounded-pill px-5 fw-bold shadow-sm">
+        <i class="bi bi-send-fill me-2"></i>Enviar Reporte
+      </button>
+    </div>
+    </form>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/report_form.js') }}"></script>
+{% endblock %}
