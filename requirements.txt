@@ -6,5 +6,4 @@ Werkzeug==3.1.9
 Pillow==13.0.0
 gunicorn==27.0.1
 psycopg2-binary==2.9.13
-pytest==9.2.0
 tzdata==2025.2

@@ -18,6 +18,7 @@ REPORT_WINDOW_SECONDS = 600  # 10 minutos
 
 MAX_TRACK_PER_WINDOW = 20
 TRACK_WINDOW_SECONDS = 60  # 1 minuto
+MAX_RATE_LIMIT_KEYS = 5000  # Cota máxima de llaves activas en RAM (anti-DoS en memoria)
 
 
 def get_client_ip() -> str:
@@ -50,16 +51,34 @@ def validate_csrf() -> None:
         abort(400, description="Token CSRF ausente o inválido.")
 
 
+def _evict_if_oversized(store: dict, window_sec: int, now: float) -> None:
+    """Poda global acotada cuando el diccionario supera MAX_RATE_LIMIT_KEYS (evita agotamiento de RAM)."""
+    if len(store) <= MAX_RATE_LIMIT_KEYS:
+        return
+    expired = [k for k, vals in list(store.items()) if not any(now - t < window_sec for t in vals)]
+    for k in expired:
+        store.pop(k, None)
+    if len(store) > MAX_RATE_LIMIT_KEYS:
+        oldest_keys = sorted(store.keys(), key=lambda k: store[k][-1] if store[k] else 0.0)
+        for k in oldest_keys[: len(store) - MAX_RATE_LIMIT_KEYS]:
+            store.pop(k, None)
+
+
 def _prune_and_check(store: dict, key, limit: int, window_sec: int) -> bool:
     now = time.time()
-    recent = [t for t in store[key] if now - t < window_sec]
-    store[key] = recent
+    _evict_if_oversized(store, window_sec, now)
+    recent = [t for t in store.get(key, ()) if now - t < window_sec]
+    if recent:
+        store[key] = recent
+    else:
+        store.pop(key, None)
     return len(recent) >= limit
 
 
 def _record_hit(store: dict, key, window_sec: int) -> int:
     now = time.time()
-    recent = [t for t in store[key] if now - t < window_sec]
+    _evict_if_oversized(store, window_sec, now)
+    recent = [t for t in store.get(key, ()) if now - t < window_sec]
     recent.append(now)
     store[key] = recent
     return len(recent)

@@ -253,10 +253,19 @@ main {
 .badge-estado-Resuelto-Despejado { background-color: #ccfbf1; color: #0f766e; border: 1px solid #99f6e4; }
 
 /* Lista lateral de incidentes */
+#incident-list {
+  overflow-x: hidden !important;
+  overflow-y: auto;
+}
+
 .incident-item {
   border: 0;
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   padding: 0.85rem 1rem;
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
   transition: background-color 0.15s ease;
 }
 

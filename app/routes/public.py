@@ -82,7 +82,9 @@ def serve_evidence(filename):
         codigo_autorizado = (request.args.get("codigo") or "").strip().upper() == reporte.codigo
         if not (es_dueno or es_operador or codigo_autorizado):
             abort(403)
-    return send_from_directory(current_app.config["UPLOAD_FOLDER"], safe_name)
+    resp = send_from_directory(current_app.config["UPLOAD_FOLDER"], safe_name)
+    resp.headers["Cache-Control"] = "private, no-store"
+    return resp
 
 
 @public_bp.route("/reportar", methods=["GET", "POST"])
@@ -251,6 +253,8 @@ def history():
     sector_id = request.args.get("sector_id", type=int)
     severidad = (request.args.get("severidad") or "").strip()
     estado = (request.args.get("estado") or "").strip()
+    fecha_desde = (request.args.get("fecha_desde") or "").strip()
+    fecha_hasta = (request.args.get("fecha_hasta") or "").strip()
 
     estados_publicos = ["Publicado/Validado", "Resuelto/Despejado"]
     query = Reporte.query.filter(Reporte.estado.in_(estados_publicos))
@@ -261,6 +265,20 @@ def history():
         query = query.filter_by(severidad=severidad)
     if estado in estados_publicos:
         query = query.filter_by(estado=estado)
+    if fecha_desde:
+        try:
+            dt_desde = fecha_local_a_utc_naive(fecha_desde, fin_del_dia=False)
+        except ValueError:
+            dt_desde = None
+        if dt_desde is not None:
+            query = query.filter(Reporte.fecha_creacion >= dt_desde)
+    if fecha_hasta:
+        try:
+            dt_hasta = fecha_local_a_utc_naive(fecha_hasta, fin_del_dia=True)
+        except ValueError:
+            dt_hasta = None
+        if dt_hasta is not None:
+            query = query.filter(Reporte.fecha_creacion <= dt_hasta)
 
     reportes = query.order_by(Reporte.fecha_creacion.desc()).all()
 
@@ -290,7 +308,13 @@ def history():
         sectores=sectores,
         recurrencia=recurrencia,
         max_incidentes=max_incidentes,
-        filtros={"sector_id": sector_id, "severidad": severidad, "estado": estado},
+        filtros={
+            "sector_id": sector_id,
+            "severidad": severidad,
+            "estado": estado,
+            "fecha_desde": fecha_desde,
+            "fecha_hasta": fecha_hasta,
+        },
     )
 
 

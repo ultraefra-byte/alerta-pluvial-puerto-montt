@@ -186,7 +186,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <span class="incident-accent-bar" style="background:${accentColor};"></span>
         <div class="flex-grow-1 min-w-0">
           <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-            <span class="fw-semibold small text-dark text-truncate">${escapeHtml(rep.direccion_referencia)}</span>
+            <span class="fw-semibold small text-dark" style="line-height: 1.3; word-break: break-word;">${escapeHtml(rep.direccion_referencia)}</span>
             <span class="badge badge-pill-soft badge-sev-${escapeHtml(rep.severidad)} flex-shrink-0">${escapeHtml(rep.severidad)}</span>
           </div>
           <div class="small text-muted d-flex flex-wrap gap-2 align-items-center" style="font-size:0.76rem;">

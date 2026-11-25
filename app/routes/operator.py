@@ -3,7 +3,7 @@ from flask_login import current_user
 
 from app import db
 from app.models import ESTADOS_REPORTE, TRANSICIONES_VALIDAS, Reporte, SectorGeografico
-from app.utils import registrar_auditoria, role_required, sanitizar_pii_texto
+from app.utils import fecha_local_a_utc_naive, registrar_auditoria, role_required, sanitizar_pii_texto
 
 operator_bp = Blueprint("operator", __name__)
 
@@ -15,6 +15,8 @@ def dashboard():
     sector_id = request.args.get("sector_id", type=int)
     severidad = (request.args.get("severidad") or "").strip()
     busqueda = (request.args.get("q") or "").strip()
+    fecha_desde = (request.args.get("fecha_desde") or "").strip()
+    fecha_hasta = (request.args.get("fecha_hasta") or "").strip()
 
     query = Reporte.query
     if estado in ESTADOS_REPORTE:
@@ -23,6 +25,20 @@ def dashboard():
         query = query.filter_by(sector_id=sector_id)
     if severidad:
         query = query.filter_by(severidad=severidad)
+    if fecha_desde:
+        try:
+            dt_desde = fecha_local_a_utc_naive(fecha_desde, fin_del_dia=False)
+        except ValueError:
+            dt_desde = None
+        if dt_desde is not None:
+            query = query.filter(Reporte.fecha_creacion >= dt_desde)
+    if fecha_hasta:
+        try:
+            dt_hasta = fecha_local_a_utc_naive(fecha_hasta, fin_del_dia=True)
+        except ValueError:
+            dt_hasta = None
+        if dt_hasta is not None:
+            query = query.filter(Reporte.fecha_creacion <= dt_hasta)
     if busqueda:
         like_expr = f"%{busqueda}%"
         query = query.filter(
@@ -49,6 +65,8 @@ def dashboard():
             "sector_id": sector_id,
             "severidad": severidad,
             "q": busqueda,
+            "fecha_desde": fecha_desde,
+            "fecha_hasta": fecha_hasta,
         },
     )
 
@@ -96,7 +114,8 @@ def update_status(reporte_id):
 
     nota_limpia = sanitizar_pii_texto(nota_operador)
     reporte.estado = nuevo_estado
-    reporte.nota_operador = nota_limpia or reporte.nota_operador
+    if "nota_operador" in request.form:
+        reporte.nota_operador = nota_limpia or None
     reporte.operador_id = current_user.id
 
     if sector_id_raw and sector_id_raw.isdigit():

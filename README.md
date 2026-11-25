@@ -26,13 +26,13 @@ Prototipo web GIS desarrollado en **Python 3.13 (Flask 3.1)**, **SQLAlchemy 2.1*
    python -m venv .venv
    ```
 
-2. Activar el entorno virtual e instalar las dependencias fijadas y auditadas (`0` CVEs en `pip-audit`):
+2. Activar el entorno virtual e instalar las dependencias fijadas (`requirements.txt` para producción; `requirements-dev.txt` para pruebas/auditoría):
    ```powershell
    # Windows PowerShell
    .\.venv\Scripts\Activate.ps1
    # Linux / macOS: source .venv/bin/activate
 
-   pip install -r requirements.txt
+   pip install -r requirements-dev.txt   # En producción solo: pip install -r requirements.txt
    ```
 
 3. Configurar variables de entorno a partir de la plantilla (nunca subir `.env` al repositorio):

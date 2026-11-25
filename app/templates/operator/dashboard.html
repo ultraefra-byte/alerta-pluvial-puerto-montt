@@ -37,9 +37,9 @@
 <!-- Filtros -->
 <form method="GET" class="card card-pm p-3 mb-3">
   <div class="row g-2 align-items-end">
-    <div class="col-md-3">
+    <div class="col-md-2">
       <label class="form-label small fw-semibold text-muted mb-1">Buscar</label>
-      <input type="text" name="q" class="form-control form-control-sm" placeholder="Código, calle o descripción..." value="{{ filtros.q }}">
+      <input type="text" name="q" class="form-control form-control-sm" placeholder="Código o calle..." value="{{ filtros.q }}">
     </div>
     <div class="col-6 col-md-2">
       <label class="form-label small fw-semibold text-muted mb-1">Estado</label>
@@ -50,7 +50,7 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-md-2">
       <label class="form-label small fw-semibold text-muted mb-1">Sector</label>
       <select name="sector_id" class="form-select form-select-sm">
         <option value="">Todos los sectores</option>
@@ -59,8 +59,8 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-6 col-md-2">
-      <label class="form-label small fw-semibold text-muted mb-1">Severidad</label>
+    <div class="col-6 col-md-1">
+      <label class="form-label small fw-semibold text-muted mb-1">Sev.</label>
       <select name="severidad" class="form-select form-select-sm">
         <option value="">Todas</option>
         {% for sev in ['Critica', 'Alta', 'Media', 'Baja'] %}
@@ -68,8 +68,16 @@
         {% endfor %}
       </select>
     </div>
-    <div class="col-6 col-md-2 d-flex gap-1">
-      <button type="submit" class="btn btn-primary btn-sm flex-grow-1">Filtrar</button>
+    <div class="col-6 col-md-2">
+      <label class="form-label small fw-semibold text-muted mb-1">Desde</label>
+      <input type="date" name="fecha_desde" class="form-control form-control-sm" value="{{ filtros.fecha_desde or '' }}">
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label small fw-semibold text-muted mb-1">Hasta</label>
+      <input type="date" name="fecha_hasta" class="form-control form-control-sm" value="{{ filtros.fecha_hasta or '' }}">
+    </div>
+    <div class="col-6 col-md-1 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-grow-1" title="Filtrar"><i class="bi bi-funnel"></i></button>
       <a href="{{ url_for('operator.dashboard') }}" class="btn btn-outline-secondary btn-sm" title="Limpiar">
         <i class="bi bi-x-lg"></i>
       </a>

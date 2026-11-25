@@ -318,10 +318,16 @@ def test_cp05_rf03_operator_lifecycle_reject_and_invalid_transition(client, app)
     assert len(pub_items) == 1
     assert "[TELÉFONO OMITIDO]" in pub_items[0]["nota_operador"]
 
-    client.post(f"/operador/reporte/{rep_id}/estado", data={"estado": "Resuelto/Despejado"})
+    # Borrado intencional de nota previa enviando nota_operador=""
+    assert client.post(
+        f"/operador/reporte/{rep_id}/estado",
+        data={"estado": "Resuelto/Despejado", "nota_operador": ""},
+    ).status_code == 302
     assert all(r["codigo"] != rep_codigo for r in client.get("/api/reportes").get_json())
+    assert client.get("/operador/?fecha_desde=2026-01-01&fecha_hasta=2026-12-31").status_code == 200
 
     with app.app_context():
+        assert db.session.get(Reporte, rep_id).nota_operador is None
         assert Auditoria.query.filter_by(accion="CAMBIO_ESTADO_REPORTE", entidad_id=rep_id).count() == 3
 
 
@@ -340,8 +346,10 @@ def test_cp06_rf04_filters_tracking_history_dst_timezone_and_haversine(client, a
     data_crit = client.get("/api/reportes?severidad=Critica").get_json()
     assert len(data_crit) >= 1 and all(item["severidad"] == "Critica" for item in data_crit)
 
-    # /historial y /seguimiento
-    assert client.get(f"/historial?sector_id={alerce_id}&severidad=Alta&estado=Publicado/Validado").status_code == 200
+    # /historial con filtro de fechas y /seguimiento
+    assert client.get(
+        f"/historial?sector_id={alerce_id}&severidad=Alta&estado=Publicado/Validado&fecha_desde=2026-01-01&fecha_hasta=2026-12-31"
+    ).status_code == 200
     assert pub_codigo.encode() in client.get(f"/seguimiento?codigo={pub_codigo}").data
     assert b"No se encontr" in client.get("/seguimiento?codigo=PM-2026-00000000").data
 
@@ -610,6 +618,13 @@ def test_cp12_owasp_a07_rate_limiting_login_and_report_spam(client, app):
     with app.app_context():
         assert Auditoria.query.filter_by(accion="LOGIN_BLOQUEADO").first() is not None
         assert Auditoria.query.filter_by(accion="REPORTE_RATE_LIMIT").first() is not None
+
+    # Verificar cota máxima de llaves en RAM (anti-DoS por IPs/correos rotativos)
+    from app.security import _FAILED_LOGINS, MAX_RATE_LIMIT_KEYS, record_failed_login
+    for idx in range(MAX_RATE_LIMIT_KEYS + 25):
+        _FAILED_LOGINS[(f"10.0.{idx // 250}.{idx % 250}", f"u{idx}@test.cl")] = [0.0]
+    record_failed_login("127.0.0.1", "trigger@test.cl")
+    assert len(_FAILED_LOGINS) <= MAX_RATE_LIMIT_KEYS
 
 
 def test_cp13_owasp_a05_security_headers_and_hsts(client, tmp_path):

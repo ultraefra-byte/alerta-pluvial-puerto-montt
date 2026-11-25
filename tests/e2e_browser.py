@@ -157,10 +157,14 @@ def main():
         initial_count = eval_js(cdp, "document.getElementById('visible-count')?.textContent")
         sync_label = eval_js(cdp, "document.getElementById('last-sync-label')?.textContent")
         assert sync_label and "(Chile)" in sync_label, f"Etiqueta horaria JS sin zona Chile: {sync_label}"
+        list_no_x = eval_js(
+            cdp,
+            "(() => { const el = document.getElementById('incident-list'); return el ? el.scrollWidth <= el.clientWidth + 1 : false; })()",
+        )
+        assert list_no_x, "Lista lateral #incident-list presenta desborde horizontal en escritorio"
         results["cp19_sync_label_chile"] = sync_label
         shot(cdp, "cap01_mapa_inicial.png")
 
-        # Filtrar por Alerce en el select
         alerce_count = eval_js(
             cdp,
             """(async () => {
@@ -172,80 +176,92 @@ def main():
                 return document.getElementById('visible-count')?.textContent;
             })()""",
         )
-        results["cp17_initial_visible"] = initial_count
-        results["cp17_alerce_filtered_visible"] = alerce_count
+        results["cp19_initial_visible"] = initial_count
+        results["cp19_alerce_filtered_visible"] = alerce_count
 
-        # CP-18: Viewport móvil (RNF01) en 375x812, 390x844 y 768x1024
-        vp_checks = {}
+        # CP-20: Responsividad RNF01 en "/" (mapa público) y "/reportar" en 375x812, 390x844 y 768x1024
+        vp_home = {}
+        vp_report = {}
         for w, h in [(375, 812), (390, 844), (768, 1024)]:
             set_vp(cdp, w, h, mobile=(w < 768))
+            cdp.call("Page.navigate", {"url": f"{BASE_URL}/"})
+            wait_ready(cdp, 2.2)
+            dims_h = eval_js(cdp, "({sw: document.documentElement.scrollWidth, iw: window.innerWidth})")
+            vp_home[f"{w}x{h}"] = dims_h
+            assert dims_h["sw"] <= dims_h["iw"], f"Overflow horizontal en '/' {w}x{h}: {dims_h}"
+
             cdp.call("Page.navigate", {"url": f"{BASE_URL}/reportar"})
             wait_ready(cdp, 2.2)
-            dims = eval_js(cdp, "({sw: document.documentElement.scrollWidth, iw: window.innerWidth})")
-            vp_checks[f"{w}x{h}"] = dims
-            assert dims["sw"] <= dims["iw"], f"Overflow horizontal en {w}x{h}: {dims}"
+            dims_r = eval_js(cdp, "({sw: document.documentElement.scrollWidth, iw: window.innerWidth})")
+            vp_report[f"{w}x{h}"] = dims_r
+            assert dims_r["sw"] <= dims_r["iw"], f"Overflow horizontal en '/reportar' {w}x{h}: {dims_r}"
             if w == 390:
                 shot(cdp, "cap03_reportar_mobile_390.png")
-        results["cp18_responsive_viewports"] = vp_checks
 
-        # CP-19: Flujo completo de reporte NUEVO CON FOTO desde navegador (Canvas -> /reportar -> /seguimiento -> /operador -> /)
+        results["cp20_responsive_viewports"] = {"home": vp_home, "reportar": vp_report}
+        results["cp20_desktop_list_no_x_overflow"] = True
+
+        # CP-21: Flujo completo de reporte NUEVO CON FOTO en Angelmó / Chinquihue
         set_vp(cdp, 1366, 960, mobile=False)
         cdp.call("Page.navigate", {"url": f"{BASE_URL}/reportar"})
         wait_ready(cdp, 3.0)
 
-        # Simular clic en mapa Leaflet (dispara evento map click en coordenadas Angelmó)
-        eval_js(
+        clicked_pos = eval_js(
             cdp,
             """(() => {
                 const mapEl = document.getElementById('map-report');
                 const rect = mapEl.getBoundingClientRect();
                 const ev = new MouseEvent('click', {
                     bubbles: true, cancelable: true,
-                    clientX: rect.left + rect.width * 0.42,
-                    clientY: rect.top + rect.height * 0.62
+                    clientX: rect.left + rect.width * 0.39,
+                    clientY: rect.top + rect.height * 0.85
                 });
                 mapEl.dispatchEvent(ev);
                 document.getElementById('direccion_referencia').value = 'Av. Pacheco Altamirano 250, Angelmó (Prueba E2E)';
                 document.querySelector('input[name="nivel_agua"][value="Alto"]').checked = true;
                 document.getElementById('descripcion').value = 'Anegamiento en calzada costera simulado durante prueba E2E con fotografía.';
-                return {lat: document.getElementById('latitud').value, lng: document.getElementById('longitud').value};
+                return {
+                    lat: parseFloat(document.getElementById('latitud').value),
+                    lng: parseFloat(document.getElementById('longitud').value)
+                };
             })()""",
         )
+        results["cp21_clicked_coords"] = clicked_pos
 
-        # Subir foto usando CDP DOM.setFileInputFiles (dispara compresión real JS Canvas!)
         doc_root = cdp.call("DOM.getDocument", {"depth": -1})
         inp_node = cdp.call("DOM.querySelector", {"nodeId": doc_root["root"]["nodeId"], "selector": "#foto"})
         cdp.call("DOM.setFileInputFiles", {"nodeId": inp_node["nodeId"], "files": [tmp_photo]})
         time.sleep(1.5)
         foto_feedback = eval_js(cdp, "document.getElementById('foto-feedback')?.textContent")
-        results["cp19_canvas_feedback"] = foto_feedback
+        results["cp21_canvas_feedback"] = foto_feedback
         eval_js(cdp, "document.getElementById('foto-preview-wrap').scrollIntoView({block:'center'})")
         time.sleep(0.5)
         shot(cdp, "cap02_reportar_form_completo.png")
 
-        # Enviar formulario real
         eval_js(cdp, "document.querySelector('form[enctype=\"multipart/form-data\"]').submit()")
         wait_ready(cdp, 3.0)
         track_url = eval_js(cdp, "window.location.href")
         m_code = re.search(r"PM-2026-[0-9A-F]{8}", track_url)
         assert m_code, f"No redirigió a seguimiento con código: {track_url}"
         new_code = m_code.group(0)
-        results["cp19_new_code"] = new_code
+        results["cp21_new_code"] = new_code
+        detected_sector = eval_js(cdp, "document.body.innerText.includes('Angelmó / Chinquihue') ? 'Angelmó / Chinquihue' : 'Otro'")
+        assert detected_sector == "Angelmó / Chinquihue", f"Sector inesperado para {clicked_pos}: {detected_sector}"
+        results["cp21_detected_sector"] = detected_sector
         shot(cdp, "cap04_confirmacion_seguimiento.png")
 
-        # Verificar que NO aparece aún en el mapa público
+        # Verificar que Pendiente NO aparece en vista pública
         cdp.call("Page.navigate", {"url": f"{BASE_URL}/"})
         wait_ready(cdp, 2.0)
         public_has_pending = eval_js(cdp, f"document.body.innerText.includes({json.dumps(new_code)})")
         assert not public_has_pending, "BUG: Reporte Pendiente apareció en vista pública!"
 
-        # Login Operador -> verificar cola Pendiente con foto -> abrir detalle -> validar -> verificar mapa público
+        # Operador revisa cola Pendiente (con filtro Desde/Hasta visible) y valida
         login_browser(cdp, "operador@puertomontt.cl", "Operador123!")
         cdp.call("Page.navigate", {"url": f"{BASE_URL}/operador/"})
         wait_ready(cdp, 2.0)
         shot(cdp, "cap05_operador_cola_pendiente.png")
 
-        # Buscar href del reporte recién creado
         detail_href = eval_js(
             cdp,
             f"""(() => {{
@@ -261,7 +277,6 @@ def main():
         time.sleep(0.4)
         shot(cdp, "cap06_operador_detalle_foto.png")
 
-        # Cambiar estado a Publicado/Validado desde el formulario real del operador
         eval_js(
             cdp,
             """(() => {
@@ -273,34 +288,40 @@ def main():
         wait_ready(cdp, 2.5)
         logout_browser(cdp)
 
-        # Volver al mapa público y abrir popup del nuevo reporte publicado!
+        # Mapa público tras validación: verificar lista sin overflow y capturar hora exacta
+        set_vp(cdp, 1366, 960, mobile=False)
         cdp.call("Page.navigate", {"url": f"{BASE_URL}/?focus={new_code}"})
         wait_ready(cdp, 4.0)
-        published_visible = eval_js(cdp, f"document.getElementById('incident-list').innerText.includes('Pacheco Altamirano')")
+        published_visible = eval_js(cdp, "document.getElementById('incident-list').innerText.includes('Pacheco Altamirano')")
         assert published_visible, "Reporte validado no apareció en mapa público!"
-        results["cp19_published_visible_on_map"] = True
+        list_no_x_after = eval_js(
+            cdp,
+            "(() => { const el = document.getElementById('incident-list'); return el ? el.scrollWidth <= el.clientWidth + 1 : false; })()",
+        )
+        assert list_no_x_after, "Lista #incident-list tiene desborde horizontal tras publicar reporte!"
+        results["cp21_published_visible_on_map"] = True
+        results["cp21_fig9_sync_label"] = eval_js(cdp, "document.getElementById('last-sync-label')?.textContent")
         eval_js(cdp, "window.scrollTo(0, 340)")
         time.sleep(0.6)
         shot(cdp, "cap07_mapa_reporte_publicado.png")
 
-        # Capturar /historial y /registro
+        # Capturar /historial (con filtro Desde/Hasta) y /registro (con Aviso de Privacidad)
         cdp.call("Page.navigate", {"url": f"{BASE_URL}/historial"})
         wait_ready(cdp, 2.0)
         shot(cdp, "cap08_historial.png")
 
-        set_vp(cdp, 1366, 1080, mobile=False)
+        set_vp(cdp, 1366, 1140, mobile=False)
         cdp.call("Page.navigate", {"url": f"{BASE_URL}/registro"})
         wait_ready(cdp, 1.5)
         shot(cdp, "cap09_registro.png")
         set_vp(cdp, 1366, 960, mobile=False)
 
-        # CP-20: Login Ciudadano -> /mis-reportes; Login Admin -> /admin/usuarios, /admin/sectores, /admin/auditoria
+        # CP-22: Login Ciudadano -> /mis-reportes + 403 -> Admin /usuarios, /sectores, /auditoria
         login_browser(cdp, "ciudadano@ejemplo.cl", "Ciudadano123!")
         cdp.call("Page.navigate", {"url": f"{BASE_URL}/mis-reportes"})
         wait_ready(cdp, 1.5)
         shot(cdp, "cap10_mis_reportes.png")
 
-        # Provocar un 403 real en navegador para que quede registrado en Auditoría
         cdp.call("Page.navigate", {"url": f"{BASE_URL}/operador/"})
         wait_ready(cdp, 1.2)
         logout_browser(cdp)
@@ -318,10 +339,9 @@ def main():
         wait_ready(cdp, 1.8)
         audit_text = eval_js(cdp, "document.querySelector('tbody').innerText")
         assert "CAMBIO_ESTADO_REPORTE" in audit_text and "ACCESO_DENEGADO_403" in audit_text
-        results["cp20_audit_events_verified"] = True
+        results["cp22_audit_events_verified"] = True
         shot(cdp, "cap13_admin_auditoria.png")
 
-        # Captura de fuente HTML /login mostrando campo csrf_token real sin contraseñas
         logout_browser(cdp)
         cdp.call("Page.navigate", {"url": f"{BASE_URL}/login"})
         wait_ready(cdp, 1.2)
@@ -343,4 +363,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
